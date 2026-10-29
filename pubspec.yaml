@@ -1,7 +1,7 @@
 name: hava_mitra_marathi
-description: Marathi weather forecast and farming guidance app
+description: Marathi weather forecast, Sahadev Bhadali, Nakshatra and rain radar
 publish_to: 'none'
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -9,10 +9,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
   http: ^1.4.0
   flutter_map: ^8.2.1
   latlong2: ^0.9.1
   geolocator: ^14.0.2
+  vedic_panchanga_dart: ^0.1.0
+  webview_flutter: ^4.13.0
 
 dev_dependencies:
   flutter_test:
