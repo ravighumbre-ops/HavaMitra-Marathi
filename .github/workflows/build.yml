@@ -1,64 +1,66 @@
-
 name: Build HavaMitra Marathi APK
-
 on:
-  workflow_dispatch:
-  push:
-    branches: [main]
-
+workflow_dispatch:
+push:
+branches: [main]
 permissions:
-  contents: read
-
+contents: read
 jobs:
-  build:
-    runs-on: ubuntu-latest
+build:
+runs-on: ubuntu-latest
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  - name: Setup Java
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: '17'
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+  - name: Setup Flutter
+    uses: subosito/flutter-action@v2
+    with:
+      channel: stable
+      cache: true
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
+  - name: Check pubspec.yaml
+    run: |
+      echo "Repository pubspec.yaml:"
+      sed -n '1,35p' pubspec.yaml
 
-      - name: Create Android platform files
-        run: |
-          flutter create --project-name hava_mitra_marathi --platforms=android /tmp/hava_mitra_marathi
-          cp -R /tmp/hava_mitra_marathi/android ./android
+  - name: Create clean Android platform files
+    run: |
+      rm -rf /tmp/hava_mitra_marathi
+      flutter create --project-name hava_mitra_marathi --platforms=android /tmp/hava_mitra_marathi
+      rm -rf android
+      cp -R /tmp/hava_mitra_marathi/android ./android
 
-      - name: Add internet and GPS permissions
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("android/app/src/main/AndroidManifest.xml")
-          s = p.read_text()
-          permissions = """    <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-          """
-          if "android.permission.INTERNET" not in s:
-              s = s.replace("<application", permissions + "\n    <application", 1)
-          p.write_text(s)
-          PY
+  - name: Add internet and GPS permissions
+    run: |
+      python3 - <<'PY'
+      from pathlib import Path
+      p = Path("android/app/src/main/AndroidManifest.xml")
+      s = p.read_text()
+      permissions = """    <uses-permission android:name="android.permission.INTERNET" />
+          <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+          <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+      """
+      if "android.permission.INTERNET" not in s:
+          s = s.replace("<application", permissions + "\n    <application", 1)
+      p.write_text(s)
+      PY
 
-      - name: Get dependencies
-        run: flutter pub get
+  - name: Get dependencies
+    run: flutter pub get
 
-      - name: Build release APK
-        run: flutter build apk --release
+  - name: Build release APK
+    run: flutter build apk --release
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: HavaMitra-Marathi-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: error
-          
+  - name: Upload APK
+    uses: actions/upload-artifact@v4
+    with:
+      name: HavaMitra-Marathi-APK
+      path: build/app/outputs/flutter-apk/app-release.apk
+      if-no-files-found: error
+
