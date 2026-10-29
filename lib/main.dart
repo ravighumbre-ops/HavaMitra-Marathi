@@ -683,3 +683,7 @@ class _WeatherHomeState extends State<WeatherHome> {
         sectionTitle(
           'वैज्ञानिक हवामान अंदाज',
           Icons.wb_sunny_outli
+      ],
+    );
+  }
+}
