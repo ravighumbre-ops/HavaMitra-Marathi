@@ -47,6 +47,8 @@ class _WeatherHomeState extends State<WeatherHome> {
   String? error;
   Map<String, dynamic>? data;
 
+  final MapController mapController = MapController();
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +56,8 @@ class _WeatherHomeState extends State<WeatherHome> {
   }
 
   Future<void> loadWeather() async {
+    if (!mounted) return;
+
     setState(() {
       loading = true;
       error = null;
@@ -82,11 +86,18 @@ class _WeatherHomeState extends State<WeatherHome> {
 
       final result = jsonDecode(response.body) as Map<String, dynamic>;
 
+      if (!result.containsKey('current') ||
+          !result.containsKey('hourly') ||
+          !result.containsKey('daily')) {
+        throw Exception('हवामानाची माहिती अपूर्ण आहे.');
+      }
+
       if (!mounted) return;
 
       setState(() {
         data = result;
         loading = false;
+        error = null;
       });
     } catch (_) {
       if (!mounted) return;
@@ -123,8 +134,8 @@ class _WeatherHomeState extends State<WeatherHome> {
 
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 20),
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 25),
         ),
       );
 
@@ -136,9 +147,13 @@ class _WeatherHomeState extends State<WeatherHome> {
         place = 'तुमचे सध्याचे GPS स्थान';
       });
 
+      if (tab == 2) {
+        mapController.move(LatLng(lat, lon), 14);
+      }
+
       await loadWeather();
     } catch (_) {
-      showMessage('GPS स्थान मिळाले नाही. पुन्हा प्रयत्न करा.');
+      showMessage('GPS स्थान मिळाले नाही. GPS सुरू करून पुन्हा प्रयत्न करा.');
     }
   }
 
@@ -226,7 +241,9 @@ class _WeatherHomeState extends State<WeatherHome> {
               : pages[tab],
       bottomNavigationBar: NavigationBar(
         selectedIndex: tab,
-        onDestinationSelected: (value) => setState(() => tab = value),
+        onDestinationSelected: (value) {
+          setState(() => tab = value);
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.wb_sunny_outlined),
@@ -389,8 +406,7 @@ class _WeatherHomeState extends State<WeatherHome> {
 
     if (start < 0) start = 0;
 
-    final end =
-        (start + 24 < times.length) ? start + 24 : times.length;
+    final end = (start + 24 < times.length) ? start + 24 : times.length;
 
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -432,6 +448,7 @@ class _WeatherHomeState extends State<WeatherHome> {
         ),
         Expanded(
           child: FlutterMap(
+            mapController: mapController,
             options: MapOptions(
               initialCenter: LatLng(lat, lon),
               initialZoom: 11,
@@ -500,8 +517,8 @@ class _WeatherHomeState extends State<WeatherHome> {
           'सिंचनाचे नियोजन करा.';
     }
 
-    return 'सध्याच्या अंदाजानुसार शेतातील कामांचे नियोजन करा. फवारणीपूर्वी '
-        'वारा आणि पावसाची शक्यता तपासा.';
+    return 'सध्याच्या अंदाजानुसार शेतातील कामांचे नियोजन करा. '
+        'फवारणीपूर्वी वारा आणि पावसाची शक्यता तपासा.';
   }
 
   Widget buildFarmer() {
@@ -581,7 +598,7 @@ class _WeatherHomeState extends State<WeatherHome> {
         'title': 'सहदेव-भाडळी परंपरा',
         'text': 'सहदेव-भाडळीच्या लोकपरंपरेत नक्षत्र, वारा, ढग आणि '
             'निसर्गातील बदल यांवर आधारित पावसाच्या म्हणी सांगितल्या जातात.',
-        'tip': 'येथे विशिष्ट मूळ म्हणीचा प्रमाणित संग्रह जोडलेला नाही.',
+        'tip': 'येथे विशिष्ट मूळ म्हणींचा प्रमाणित संग्रह जोडलेला नाही.',
       },
       {
         'title': 'नक्षत्र आणि पाऊस',
@@ -650,7 +667,10 @@ class _WeatherHomeState extends State<WeatherHome> {
       children: [
         const Text(
           '🌙 पारंपरिक पावसाचे संकेत',
-          style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 23,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
@@ -664,26 +684,50 @@ class _WeatherHomeState extends State<WeatherHome> {
             padding: EdgeInsets.all(14),
             child: Text(
               'महत्त्वाचे: या विभागात आजचे खगोलशास्त्रीय नक्षत्र '
-              'स्वयंचलितपणे मोजले जात नाही. खालील माहिती '
-              'लोकपरंपरा आणि निसर्गनिरीक्षणासाठी आहे.',
+              'स्वयंचलितपणे मोजले जात नाही. खालील माहिती लोकपरंपरा '
+              'आणि निसर्गनिरीक्षणासाठी आहे.',
               style: TextStyle(fontSize: 14),
             ),
           ),
         ),
-        sectionTitle(
-          'सहदेव-भाडळी आणि नक्षत्र परंपरा',
-          Icons.menu_book,
-        ),
+        sectionTitle('सहदेव-भाडळी आणि नक्षत्र परंपरा', Icons.menu_book),
         ...sayings.map(informationCard),
-        sectionTitle(
-          'निसर्गातील पारंपरिक संकेत',
-          Icons.cloud_outlined,
-        ),
+        sectionTitle('निसर्गातील पारंपरिक संकेत', Icons.cloud_outlined),
         ...observations.map(informationCard),
-        sectionTitle(
-          'वैज्ञानिक हवामान अंदाज',
-          Icons.wb_sunny_outli
+        sectionTitle('वैज्ञानिक हवामान अंदाज', Icons.wb_sunny_outlined),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'हवामित्रच्या इतर विभागांतून तपासा:',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '• आज: तापमान आणि पावसाची शक्यता\n'
+                  '• तासानुसार: पुढील २४ तासांचा अंदाज\n'
+                  '• नकाशा: तुमचे स्थान\n'
+                  '• शेतकरी: हवामानाधारित सामान्य सूचना',
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'लोकपरंपरेतील संकेत आणि आधुनिक अंदाज वेगळे ठेवा. '
+                  'पाऊस, फवारणी किंवा सिंचनाचा निर्णय घेताना '
+                  'अद्ययावत हवामान माहिती व स्थानिक परिस्थिती तपासा.',
+                  style: TextStyle(color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
 }
+              
