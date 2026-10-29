@@ -1,7 +1,7 @@
 name: hava_mitra_marathi
-description: Marathi weather app for farmers
+description: Marathi weather forecast and farming guidance app
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -12,6 +12,7 @@ dependencies:
   http: ^1.4.0
   flutter_map: ^8.2.1
   latlong2: ^0.9.1
+  geolocator: ^14.0.2
 
 dev_dependencies:
   flutter_test:
@@ -20,3 +21,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  
