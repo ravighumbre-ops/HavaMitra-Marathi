@@ -1,13 +1,12 @@
-import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
-import 'package:latlong2/latlong.dart';
 
-const double defaultLat = 19.130057;
-const double defaultLon = 76.469843;
-const String defaultPlace = 'वाघाळा, पाथरी, परभणी';
+import 'dart:convert';
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,31 +22,42 @@ class HavaMitraApp extends StatelessWidget {
       title: 'हवामित्र मराठी',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+        ),
         useMaterial3: true,
       ),
-      home: const WeatherHome(),
+      home: const HavaMitraHome(),
     );
   }
 }
 
-class WeatherHome extends StatefulWidget {
-  const WeatherHome({super.key});
+class HavaMitraHome extends StatefulWidget {
+  const HavaMitraHome({super.key});
 
   @override
-  State<WeatherHome> createState() => _WeatherHomeState();
+  State<HavaMitraHome> createState() => _HavaMitraHomeState();
 }
 
-class _WeatherHomeState extends State<WeatherHome> {
-  int tab = 0;
-  double lat = defaultLat;
-  double lon = defaultLon;
-  String place = defaultPlace;
-  bool loading = true;
-  String? error;
-  Map<String, dynamic>? data;
+class _HavaMitraHomeState extends State<HavaMitraHome> {
+  final LatLng villageLocation =
+      const LatLng(19.130057, 76.469843);
 
-  final MapController mapController = MapController();
+  LatLng selectedLocation =
+      const LatLng(19.130057, 76.469843);
+
+  String villageName = 'वाघाळा, ता. पाथरी, जि. परभणी';
+  String weatherText = 'हवामानाची माहिती मिळवत आहे...';
+  String temperature = '--';
+  String humidity = '--';
+  String windSpeed = '--';
+  String rainChance = '--';
+  String errorMessage = '';
+  bool loading = false;
+
+  Map<String, dynamic>? weatherData;
+
+  int selectedTab = 0;
 
   @override
   void initState() {
@@ -56,69 +66,89 @@ class _WeatherHomeState extends State<WeatherHome> {
   }
 
   Future<void> loadWeather() async {
-    if (!mounted) return;
-
     setState(() {
       loading = true;
-      error = null;
+      errorMessage = '';
     });
 
     try {
-      final uri = Uri.https('api.open-meteo.com', '/v1/forecast', {
-        'latitude': '$lat',
-        'longitude': '$lon',
-        'current':
-            'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m',
-        'hourly':
-            'temperature_2m,precipitation_probability,precipitation,weather_code',
-        'daily':
-            'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum',
-        'forecast_days': '10',
-        'timezone': 'Asia/Kolkata',
-      });
+      final lat = selectedLocation.latitude;
+      final lon = selectedLocation.longitude;
 
-      final response =
-          await http.get(uri).timeout(const Duration(seconds: 20));
+      final url = Uri.parse(
+        'https://api.open-meteo.com/v1/forecast'
+        '?latitude=$lat&longitude=$lon'
+        '&current=temperature_2m,relative_humidity_2m,'
+        'precipitation,weather_code,wind_speed_10m'
+        '&hourly=precipitation_probability,precipitation'
+        '&forecast_days=3&timezone=Asia%2FKolkata',
+      );
 
-      if (response.statusCode != 200) {
-        throw Exception('हवामान सर्व्हरने माहिती दिली नाही.');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data =
+            jsonDecode(response.body) as Map<String, dynamic>;
+        final current =
+            data['current'] as Map<String, dynamic>;
+
+        if (!mounted) return;
+
+        setState(() {
+          weatherData = data;
+          temperature =
+              '${current['temperature_2m']}°C';
+          humidity =
+              '${current['relative_humidity_2m']}%';
+          windSpeed =
+              '${current['wind_speed_10m']} km/h';
+
+          final rain =
+              current['precipitation'] ?? 0;
+          rainChance = '$rain mm';
+
+          weatherText = getWeatherDescription(
+            current['weather_code'] as int? ?? 0,
+          );
+
+          loading = false;
+        });
+      } else {
+        throw Exception('हवामान माहिती उपलब्ध नाही.');
       }
-
-      final result = jsonDecode(response.body) as Map<String, dynamic>;
-
-      if (!result.containsKey('current') ||
-          !result.containsKey('hourly') ||
-          !result.containsKey('daily')) {
-        throw Exception('हवामानाची माहिती अपूर्ण आहे.');
-      }
-
+    } catch (e) {
       if (!mounted) return;
-
-      setState(() {
-        data = result;
-        loading = false;
-        error = null;
-      });
-    } catch (_) {
-      if (!mounted) return;
-
       setState(() {
         loading = false;
-        error = 'हवामान मिळाले नाही. इंटरनेट तपासून पुन्हा प्रयत्न करा.';
+        errorMessage =
+            'इंटरनेट तपासा आणि पुन्हा प्रयत्न करा.';
       });
     }
   }
 
-  Future<void> useGps() async {
-    try {
-      final enabled = await Geolocator.isLocationServiceEnabled();
+  String getWeatherDescription(int code) {
+    if (code == 0) return 'आकाश निरभ्र';
+    if (code <= 3) return 'ढगाळ वातावरण';
+    if (code <= 48) return 'धुके';
+    if (code <= 67) return 'पाऊस';
+    if (code <= 77) return 'बर्फवृष्टी';
+    if (code <= 82) return 'पावसाच्या सरी';
+    if (code <= 99) return 'वादळाची शक्यता';
+    return 'हवामानाची माहिती';
+  }
 
-      if (!enabled) {
-        showMessage('मोबाईलचे Location/GPS सुरू करा.');
+  Future<void> getCurrentLocation() async {
+    try {
+      bool serviceEnabled =
+          await Geolocator.isLocationServiceEnabled();
+
+      if (!serviceEnabled) {
+        showMessage('मोबाइलचे Location सुरू करा.');
         return;
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
+      LocationPermission permission =
+          await Geolocator.checkPermission();
 
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -126,427 +156,354 @@ class _WeatherHomeState extends State<WeatherHome> {
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        showMessage('Settings मध्ये Location permission द्या.');
+        showMessage('GPS वापरण्याची परवानगी द्या.');
         return;
       }
 
-      showMessage('तुमचे स्थान शोधत आहे...');
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 25),
-        ),
-      );
+      final position = await Geolocator.getCurrentPosition();
 
       if (!mounted) return;
 
       setState(() {
-        lat = position.latitude;
-        lon = position.longitude;
-        place = 'तुमचे सध्याचे GPS स्थान';
+        selectedLocation = LatLng(
+          position.latitude,
+          position.longitude,
+        );
+        villageName = 'तुमचे सध्याचे GPS स्थान';
       });
 
-      if (tab == 2) {
-        mapController.move(LatLng(lat, lon), 14);
-      }
-
       await loadWeather();
-    } catch (_) {
-      showMessage('GPS स्थान मिळाले नाही. GPS सुरू करून पुन्हा प्रयत्न करा.');
+    } catch (e) {
+      showMessage('GPS स्थान मिळाले नाही.');
     }
   }
 
   void showMessage(String message) {
-    if (!mounted) return;
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
   }
 
-  String weatherText(dynamic code) {
-    final c = (code as num?)?.toInt() ?? 0;
-
-    if (c == 0) return 'निरभ्र आकाश';
-    if (c <= 3) return 'ढगाळ हवामान';
-    if (c == 45 || c == 48) return 'धुके';
-    if (c >= 51 && c <= 57) return 'रिमझिम पाऊस';
-    if (c >= 61 && c <= 67) return 'पाऊस';
-    if (c >= 71 && c <= 77) return 'बर्फवृष्टी';
-    if (c >= 80 && c <= 82) return 'पावसाच्या सरी';
-    if (c >= 95) return 'मेघगर्जना किंवा वादळ';
-
-    return 'बदलते हवामान';
-  }
-
-  Map<String, dynamic> get current =>
-      data!['current'] as Map<String, dynamic>;
-
-  Map<String, dynamic> get hourly =>
-      data!['hourly'] as Map<String, dynamic>;
-
-  Map<String, dynamic> get daily =>
-      data!['daily'] as Map<String, dynamic>;
-
-  @override
-  Widget build(BuildContext context) {
-    final pages = [
-      buildToday(),
-      buildHourly(),
-      buildMap(),
-      buildFarmer(),
-      buildTradition(),
-    ];
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('🌦️ हवामित्र मराठी'),
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            tooltip: 'GPS स्थान',
-            onPressed: useGps,
-            icon: const Icon(Icons.my_location),
-          ),
-          IconButton(
-            tooltip: 'हवामान पुन्हा तपासा',
-            onPressed: loadWeather,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.cloud_off, size: 60),
-                        const SizedBox(height: 12),
-                        Text(error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: loadWeather,
-                          child: const Text('पुन्हा प्रयत्न करा'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : pages[tab],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: tab,
-        onDestinationSelected: (value) {
-          setState(() => tab = value);
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.wb_sunny_outlined),
-            label: 'आज',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.schedule),
-            label: 'तासानुसार',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.map_outlined),
-            label: 'नकाशा',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.agriculture),
-            label: 'शेतकरी',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.nights_stay_outlined),
-            label: 'पारंपरिक',
-          ),
-        ],
+  Widget weatherCard(
+    String title,
+    String value,
+    IconData icon,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          children: [
+            Icon(icon, size: 30, color: Colors.blue),
+            const SizedBox(height: 8),
+            Text(title),
+            const SizedBox(height: 5),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
-
-  Widget infoCard(String title, String value, IconData icon) {
-    return Expanded(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
+  
+  Widget buildHome() {
+    return RefreshIndicator(
+      onRefresh: loadWeather,
+      child: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          Card(
+            color: Colors.blue.shade700,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.cloud,
+                    size: 55,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    villageName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    temperature,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 42,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    weatherText,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                    ),
+                  ),
+                  if (loading)
+                    const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                      ),
+                    ),
+                  if (errorMessage.isNotEmpty)
+                    Text(
+                      errorMessage,
+                      style: const TextStyle(
+                        color: Colors.white,
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: loadWeather,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('हवामान अपडेट'),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: getCurrentLocation,
+                        icon: const Icon(Icons.my_location),
+                        label: const Text('माझे GPS'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
             children: [
-              Icon(icon, color: Colors.teal, size: 28),
-              const SizedBox(height: 6),
-              Text(title, textAlign: TextAlign.center),
-              const SizedBox(height: 5),
-              Text(
-                value,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                ),
+              weatherCard(
+                'आर्द्रता',
+                humidity,
+                Icons.water_drop,
+              ),
+              weatherCard(
+                'वाऱ्याचा वेग',
+                windSpeed,
+                Icons.air,
+              ),
+              weatherCard(
+                'सध्याचा पाऊस',
+                rainChance,
+                Icons.umbrella,
+              ),
+              weatherCard(
+                'पावसाची शक्यता',
+                getNextRainChance(),
+                Icons.cloudy_snowing,
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget buildToday() {
-    final temp = (current['temperature_2m'] as num).round();
-    final apparent = (current['apparent_temperature'] as num).round();
-    final humidity = current['relative_humidity_2m'];
-    final wind = current['wind_speed_10m'];
-    final rainChance =
-        (daily['precipitation_probability_max'] as List).first;
-    final todayRain = (daily['precipitation_sum'] as List).first;
-
-    return ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        Text(
-          place,
-          style: const TextStyle(
-            fontSize: 19,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Card(
-          color: Colors.teal.shade50,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                const Icon(Icons.cloud, size: 65, color: Colors.teal),
-                Text(
-                  '$temp°C',
-                  style: const TextStyle(
-                    fontSize: 46,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  weatherText(current['weather_code']),
-                  style: const TextStyle(fontSize: 20),
-                ),
-                Text('जाणवणारे तापमान: $apparent°C'),
-              ],
+          const SizedBox(height: 12),
+          const Text(
+            'पुढील काही तासांचा अंदाज',
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
             ),
           ),
-        ),
-        Row(
-          children: [
-            infoCard('पावसाची शक्यता', '$rainChance%', Icons.umbrella),
-            infoCard('आर्द्रता', '$humidity%', Icons.water_drop),
-          ],
-        ),
-        Row(
-          children: [
-            infoCard('वारा', '$wind km/h', Icons.air),
-            infoCard('आजचा अंदाजित पाऊस', '$todayRain mm', Icons.grain),
-          ],
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'पुढील १० दिवस',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        ...dailyRows(),
-        const Text(
-          'हा मॉडेलवर आधारित अंदाज आहे; प्रत्यक्ष पावसाची हमी नाही.',
-          style: TextStyle(color: Colors.black54, fontSize: 12),
-        ),
-      ],
-    );
-  }
-
-  List<Widget> dailyRows() {
-    final dates = daily['time'] as List;
-    final max = daily['temperature_2m_max'] as List;
-    final min = daily['temperature_2m_min'] as List;
-    final rain = daily['precipitation_probability_max'] as List;
-    final codes = daily['weather_code'] as List;
-    final amount = daily['precipitation_sum'] as List;
-
-    return List.generate(
-      dates.length,
-      (i) => Card(
-        child: ListTile(
-          leading: const Icon(Icons.calendar_month, color: Colors.teal),
-          title: Text('${dates[i]}'),
-          subtitle: Text(
-            '${weatherText(codes[i])} • पावसाची शक्यता ${rain[i]}% • '
-            'पाऊस ${amount[i]} mm',
+          buildHourlyForecast(),
+          const SizedBox(height: 12),
+          const Text(
+            'शेतीसाठी सूचना',
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          trailing: Text(
-            '${(max[i] as num).round()}° / ${(min[i] as num).round()}°',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          Card(
+            child: ListTile(
+              leading: const Icon(
+                Icons.agriculture,
+                color: Colors.green,
+              ),
+              title: const Text('शेतकऱ्यांसाठी'),
+              subtitle: Text(getFarmAdvice()),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget buildHourly() {
-    final times = hourly['time'] as List;
-    final temps = hourly['temperature_2m'] as List;
-    final chances = hourly['precipitation_probability'] as List;
-    final amounts = hourly['precipitation'] as List;
-    final codes = hourly['weather_code'] as List;
-    final now = DateTime.now();
+  String getNextRainChance() {
+    if (weatherData == null) return '--';
 
-    int start = times.indexWhere((value) {
-      return !DateTime.parse(value.toString()).isBefore(now);
+    final hourly =
+        weatherData!['hourly'] as Map<String, dynamic>?;
+    final chances =
+        hourly?['precipitation_probability'] as List?;
+
+    if (chances == null || chances.isEmpty) return '--';
+
+    return '${chances.first}%';
+  }
+
+  Widget buildHourlyForecast() {
+    if (weatherData == null) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('हवामानाची माहिती लोड होत आहे...'),
+        ),
+      );
+    }
+
+    final hourly =
+        weatherData!['hourly'] as Map<String, dynamic>;
+    final times = hourly['time'] as List;
+    final rain = hourly['precipitation'] as List;
+    final chances =
+        hourly['precipitation_probability'] as List;
+
+    final now = DateTime.now();
+    int start = times.indexWhere((time) {
+      return !DateTime.parse(time.toString()).isBefore(now);
     });
 
     if (start < 0) start = 0;
 
-    final end = (start + 24 < times.length) ? start + 24 : times.length;
+    final end = math.min(start + 6, times.length);
 
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          children: List.generate(end - start, (index) {
+            final i = start + index;
+            final time = DateTime.parse(times[i].toString());
+
+            return ListTile(
+              dense: true,
+              leading: const Icon(Icons.access_time),
+              title: Text(
+                '${time.hour.toString().padLeft(2, '0')}:00',
+              ),
+              subtitle: Text(
+                'पाऊस: ${rain[i]} mm',
+              ),
+              trailing: Text(
+                '${chances[i]}%',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  String getFarmAdvice() {
+    if (weatherData == null) {
+      return 'हवामान मिळाल्यानंतर सूचना दिसतील.';
+    }
+
+    final hourly =
+        weatherData!['hourly'] as Map<String, dynamic>;
+    final rain = hourly['precipitation'] as List;
+    final total = rain
+        .take(24)
+        .fold<double>(
+          0,
+          (sum, value) => sum + (value as num).toDouble(),
+        );
+
+    if (total >= 10) {
+      return 'पुढील 24 तासांत पावसाचा अंदाज आहे. '
+          'फवारणी आणि खत देण्याची वेळ काळजीपूर्वक ठरवा.';
+    }
+
+    return 'पुढील 24 तासांचा अंदाज तपासा. '
+        'मातीतील ओलावा पाहूनच सिंचन करा.';
+  }
+  
+  Widget buildTradition() {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        const Text(
-          'पुढील २४ तासांचा अंदाज',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        ...List.generate(end - start, (n) {
-          final i = start + n;
-          final dt = DateTime.parse(times[i].toString());
-          final hour = dt.hour.toString().padLeft(2, '0');
-
-          return Card(
-            child: ListTile(
-              leading: const Icon(Icons.access_time, color: Colors.teal),
-              title: Text('$hour:00 • ${weatherText(codes[i])}'),
-              subtitle: Text(
-                'पावसाची शक्यता ${chances[i]}% • पाऊस ${amounts[i]} mm',
-              ),
-              trailing: Text('${(temps[i] as num).round()}°C'),
+        const Card(
+          child: ListTile(
+            leading: Icon(
+              Icons.auto_awesome,
+              color: Colors.deepPurple,
+              size: 35,
             ),
-          );
-        }),
-      ],
-    );
-  }
-
-  Widget buildMap() {
-    return Column(
-      children: [
-        ListTile(
-          title: const Text('हवामित्र नकाशा'),
-          subtitle: Text(place),
-          trailing: IconButton(
-            onPressed: useGps,
-            icon: const Icon(Icons.my_location),
+            title: Text(
+              'नक्षत्र आणि पाऊस',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            subtitle: Text(
+              'नक्षत्रांशी संबंधित पारंपरिक पावसाचे संकेत '
+              'पाहण्यासाठी ही माहिती वापरा. '
+              'नक्षत्रावरून पाऊस निश्चित सांगता येत नाही.',
+            ),
           ),
         ),
-        Expanded(
-          child: FlutterMap(
-            mapController: mapController,
-            options: MapOptions(
-              initialCenter: LatLng(lat, lon),
-              initialZoom: 11,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.havamitra.marathi',
-              ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: LatLng(lat, lon),
-                    width: 130,
-                    height: 70,
-                    child: const Column(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          color: Colors.red,
-                          size: 38,
-                        ),
-                        Text(
-                          'तुमचे स्थान',
-                          style: TextStyle(
-                            backgroundColor: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              RichAttributionWidget(
-                attributions: [
-                  TextSourceAttribution('OpenStreetMap contributors'),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  String farmerAdvice() {
-    final chance =
-        ((daily['precipitation_probability_max'] as List).first as num)
-            .toInt();
-    final temp = (current['temperature_2m'] as num).toDouble();
-
-    if (chance >= 70) {
-      return 'पावसाची शक्यता जास्त आहे. कापणी, फवारणी आणि शेतातील कामाचे '
-          'नियोजन करण्यापूर्वी ताजा अंदाज तपासा.';
-    }
-
-    if (chance >= 40) {
-      return 'पावसाची शक्यता मध्यम आहे. शेतातील कामे ठरवताना पिकाची अवस्था '
-          'आणि स्थानिक परिस्थिती पाहा.';
-    }
-
-    if (temp >= 35) {
-      return 'उष्णता जास्त आहे. पिकाची गरज आणि मातीतील ओलावा पाहून '
-          'सिंचनाचे नियोजन करा.';
-    }
-
-    return 'सध्याच्या अंदाजानुसार शेतातील कामांचे नियोजन करा. '
-        'फवारणीपूर्वी वारा आणि पावसाची शक्यता तपासा.';
-  }
-
-  Widget buildFarmer() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text(
-          'शेतकऱ्यांसाठी मार्गदर्शन',
-          style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
         Card(
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Text(
-              farmerAdvice(),
-              style: const TextStyle(fontSize: 18),
+          child: ListTile(
+            leading: const Icon(
+              Icons.nights_stay,
+              color: Colors.indigo,
+              size: 35,
+            ),
+            title: const Text('आजचे अंदाजे चंद्र नक्षत्र'),
+            subtitle: Text(
+              getApproxNakshatra(),
             ),
           ),
         ),
         const Card(
           child: ListTile(
-            leading: Icon(Icons.info_outline),
+            leading: Icon(
+              Icons.menu_book,
+              color: Colors.brown,
+              size: 35,
+            ),
+            title: Text('सहदेव भाडळी परंपरा'),
+            subtitle: Text(
+              'सहदेव भाडळी ही महाराष्ट्रातील पारंपरिक '
+              'पर्जन्य-अंदाजाची लोकपरंपरा आहे. '
+              'ढग, वारा, आर्द्रता आणि निसर्गातील बदल '
+              'यांचे निरीक्षण केले जाते. '
+              'हे संकेत वैज्ञानिक हवामान अंदाजाची जागा घेत नाहीत.',
+            ),
+          ),
+        ),
+        const Card(
+          child: ListTile(
+            leading: Icon(
+              Icons.info_outline,
+              color: Colors.orange,
+            ),
             title: Text('महत्त्वाची सूचना'),
             subtitle: Text(
-              'ही सामान्य हवामानाधारित सूचना आहे. पीक, औषधाचे लेबल आणि '
-              'कृषी अधिकाऱ्यांचा सल्ला लक्षात घ्या. फक्त ॲपवरून फवारणी '
-              'किंवा सिंचनाचा अंतिम निर्णय घेऊ नका.',
+              'पेरणी, फवारणी किंवा सिंचनाचे निर्णय '
+              'घेताना अधिकृत हवामान अंदाजही तपासा.',
             ),
           ),
         ),
@@ -554,180 +511,182 @@ class _WeatherHomeState extends State<WeatherHome> {
     );
   }
 
-  Widget buildTradition() {
-    final now = DateTime.now();
+  String getApproxNakshatra() {
+    final now = DateTime.now().toUtc();
 
-    final months = [
-      'जानेवारी',
-      'फेब्रुवारी',
-      'मार्च',
-      'एप्रिल',
-      'मे',
-      'जून',
-      'जुलै',
-      'ऑगस्ट',
-      'सप्टेंबर',
-      'ऑक्टोबर',
-      'नोव्हेंबर',
-      'डिसेंबर',
-    ];
+    final jd = now.millisecondsSinceEpoch /
+            86400000.0 +
+        2440587.5;
 
-    final observations = <Map<String, String>>[
-      {
-        'title': 'काळे ढग आणि वाढता वारा',
-        'text': 'काळे ढग, वाऱ्यातील बदल आणि मेघगर्जना हे पावसाच्या '
-            'शक्यतेचे संकेत असू शकतात.',
-        'tip': 'स्थानिक निरीक्षण; पावसाची खात्री नाही.',
-      },
-      {
-        'title': 'मुंग्या आणि कीटकांची हालचाल',
-        'text': 'काही लोकपरंपरांमध्ये मुंग्या किंवा कीटकांच्या '
-            'हालचालींना पावसाशी जोडले जाते.',
-        'tip': 'हा विश्वासार्ह स्वतंत्र हवामान अंदाज नाही.',
-      },
-      {
-        'title': 'आकाशातील ढगांचे स्वरूप',
-        'text': 'ढगांची उंची, घनता आणि हालचाल पाहून वातावरणातील '
-            'बदलांचा अंदाज लावण्याचा प्रयत्न केला जातो.',
-        'tip': 'अचूक अंदाजासाठी अधिकृत हवामान माहिती तपासा.',
-      },
-    ];
+    final t = (jd - 2451545.0) / 36525.0;
 
-    final sayings = <Map<String, String>>[
-      {
-        'title': 'सहदेव-भाडळी परंपरा',
-        'text': 'सहदेव-भाडळीच्या लोकपरंपरेत नक्षत्र, वारा, ढग आणि '
-            'निसर्गातील बदल यांवर आधारित पावसाच्या म्हणी सांगितल्या जातात.',
-        'tip': 'येथे विशिष्ट मूळ म्हणींचा प्रमाणित संग्रह जोडलेला नाही.',
-      },
-      {
-        'title': 'नक्षत्र आणि पाऊस',
-        'text': 'पारंपरिक पावसाच्या अंदाजात मृग, आर्द्रा, पुनर्वसू, '
-            'पुष्य आणि इतर नक्षत्रांचा उल्लेख आढळतो.',
-        'tip': 'नक्षत्रावरून पावसाची हमी देता येत नाही.',
-      },
-    ];
+    var moonLongitude = 218.3164477 +
+        481267.88123421 * t -
+        0.0015786 * t * t;
 
-    Widget sectionTitle(String title, IconData icon) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 14, bottom: 6),
-        child: Row(
-          children: [
-            Icon(icon, color: Colors.teal, size: 26),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
+    moonLongitude %= 360;
+
+    if (moonLongitude < 0) {
+      moonLongitude += 360;
     }
 
-    Widget informationCard(Map<String, String> item) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item['title']!,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                item['text']!,
-                style: const TextStyle(fontSize: 15),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'टीप: ${item['tip']}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.brown,
+    final names = [
+      'अश्विनी',
+      'भरणी',
+      'कृत्तिका',
+      'रोहिणी',
+      'मृगशीर्ष',
+      'आर्द्रा',
+      'पुनर्वसू',
+      'पुष्य',
+      'आश्लेषा',
+      'मघा',
+      'पूर्वा फाल्गुनी',
+      'उत्तरा फाल्गुनी',
+      'हस्त',
+      'चित्रा',
+      'स्वाती',
+      'विशाखा',
+      'अनुराधा',
+      'ज्येष्ठा',
+      'मूळ',
+      'पूर्वाषाढा',
+      'उत्तराषाढा',
+      'श्रवण',
+      'धनिष्ठा',
+      'शततारका',
+      'पूर्वाभाद्रपदा',
+      'उत्तराभाद्रपदा',
+      'रेवती',
+    ];
+
+    final index =
+        (moonLongitude / (360 / 27)).floor();
+
+    return '${names[index]} (अंदाजे गणना)';
+  }
+
+  Widget buildRadar() {
+    final controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..loadRequest(
+        Uri.parse(
+          'https://mausam.imd.gov.in/responsive/radar.php',
+        ),
+      );
+
+    return Column(
+      children: [
+        const Padding(
+          padding: EdgeInsets.all(12),
+          child: Text(
+            'पावसाचा रडार',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'रडारचे चित्र दिसण्यासाठी इंटरनेट आवश्यक आहे. '
+            'वेबसाइट उपलब्ध नसेल तर रडार दिसणार नाही.',
+          ),
+        ),
+        Expanded(
+          child: WebViewWidget(
+            controller: controller,
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = [
+      buildHome(),
+      buildTradition(),
+      buildRadar(),
+      FlutterMap(
+        options: MapOptions(
+          initialCenter: selectedLocation,
+          initialZoom: 12,
+          onTap: (tapPosition, point) {
+            setState(() {
+              selectedLocation = point;
+              villageName = 'नकाशावर निवडलेले स्थान';
+            });
+            loadWeather();
+          },
+        ),
+        children: [
+          TileLayer(
+            urlTemplate:
+                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.havamitra.marathi',
+          ),
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: selectedLocation,
+                width: 50,
+                height: 50,
+                child: const Icon(
+                  Icons.location_pin,
+                  color: Colors.red,
+                  size: 42,
                 ),
               ),
             ],
           ),
-        ),
-      );
-    }
+        ],
+      ),
+    ];
 
-    return ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        const Text(
-          '🌙 पारंपरिक पावसाचे संकेत',
-          style: TextStyle(
-            fontSize: 23,
-            fontWeight: FontWeight.bold,
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('हवामित्र मराठी 🌦️'),
+        backgroundColor: Colors.blue.shade100,
+        actions: [
+          IconButton(
+            onPressed: loadWeather,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'हवामान अपडेट',
           ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'आजची तारीख: ${now.day} ${months[now.month - 1]} ${now.year}',
-          style: const TextStyle(fontSize: 15),
-        ),
-        const SizedBox(height: 8),
-        const Card(
-          color: Color(0xFFE0F2F1),
-          child: Padding(
-            padding: EdgeInsets.all(14),
-            child: Text(
-              'महत्त्वाचे: या विभागात आजचे खगोलशास्त्रीय नक्षत्र '
-              'स्वयंचलितपणे मोजले जात नाही. खालील माहिती लोकपरंपरा '
-              'आणि निसर्गनिरीक्षणासाठी आहे.',
-              style: TextStyle(fontSize: 14),
-            ),
+        ],
+      ),
+      body: IndexedStack(
+        index: selectedTab,
+        children: pages,
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: selectedTab,
+        onDestinationSelected: (index) {
+          setState(() {
+            selectedTab = index;
+          });
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.cloud),
+            label: 'हवामान',
           ),
-        ),
-        sectionTitle('सहदेव-भाडळी आणि नक्षत्र परंपरा', Icons.menu_book),
-        ...sayings.map(informationCard),
-        sectionTitle('निसर्गातील पारंपरिक संकेत', Icons.cloud_outlined),
-        ...observations.map(informationCard),
-        sectionTitle('वैज्ञानिक हवामान अंदाज', Icons.wb_sunny_outlined),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'हवामित्रच्या इतर विभागांतून तपासा:',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '• आज: तापमान आणि पावसाची शक्यता\n'
-                  '• तासानुसार: पुढील २४ तासांचा अंदाज\n'
-                  '• नकाशा: तुमचे स्थान\n'
-                  '• शेतकरी: हवामानाधारित सामान्य सूचना',
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'लोकपरंपरेतील संकेत आणि आधुनिक अंदाज वेगळे ठेवा. '
-                  'पाऊस, फवारणी किंवा सिंचनाचा निर्णय घेताना '
-                  'अद्ययावत हवामान माहिती व स्थानिक परिस्थिती तपासा.',
-                  style: TextStyle(color: Colors.black54),
-                ),
-              ],
-            ),
+          NavigationDestination(
+            icon: Icon(Icons.auto_awesome),
+            label: 'नक्षत्र',
           ),
-        ),
-      ],
+          NavigationDestination(
+            icon: Icon(Icons.radar),
+            label: 'रडार',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.map),
+            label: 'नकाशा',
+          ),
+        ],
+      ),
     );
   }
 }
-              
