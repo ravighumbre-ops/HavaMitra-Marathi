@@ -463,48 +463,172 @@ class _WeatherHomeState extends State<WeatherHome> {
   }
 
   Widget buildTradition() {
+    final now = DateTime.now();
+
+    final months = [
+      'जानेवारी', 'फेब्रुवारी', 'मार्च', 'एप्रिल',
+      'मे', 'जून', 'जुलै', 'ऑगस्ट',
+      'सप्टेंबर', 'ऑक्टोबर', 'नोव्हेंबर', 'डिसेंबर'
+    ];
+
+    final observations = <Map<String, String>>[
+      {
+        'title': 'काळे ढग आणि वाढता वारा',
+        'text': 'काळे ढग, वाऱ्यातील बदल आणि मेघगर्जना हे पावसाच्या '
+            'शक्यतेचे संकेत असू शकतात.',
+        'tip': 'स्थानिक निरीक्षण; पावसाची खात्री नाही.'
+      },
+      {
+        'title': 'मुंग्या आणि कीटकांची हालचाल',
+        'text': 'काही लोकपरंपरांमध्ये मुंग्या किंवा कीटकांच्या '
+            'हालचालींना पावसाशी जोडले जाते.',
+        'tip': 'हा विश्वासार्ह स्वतंत्र हवामान अंदाज नाही.'
+      },
+      {
+        'title': 'आकाशातील ढगांचे स्वरूप',
+        'text': 'ढगांची उंची, घनता आणि हालचाल पाहून वातावरणातील '
+            'बदलांचा अंदाज लावण्याचा प्रयत्न केला जातो.',
+        'tip': 'अचूक अंदाजासाठी अधिकृत हवामान माहिती तपासा.'
+      },
+    ];
+
+    final sayings = <Map<String, String>>[
+      {
+        'title': 'सहदेव-भाडळी परंपरा',
+        'text': 'सहदेव-भाडळीच्या लोकपरंपरेत नक्षत्र, वारा, '
+            'ढग आणि निसर्गातील बदल यांवर आधारित पावसाच्या '
+            'म्हणी सांगितल्या जातात.',
+        'tip': 'येथे विशिष्ट मूळ म्हणीचा प्रमाणित संग्रह जोडलेला नाही.'
+      },
+      {
+        'title': 'नक्षत्र आणि पाऊस',
+        'text': 'पारंपरिक पावसाच्या अंदाजात मृग, आर्द्रा, '
+            'पुनर्वसू, पुष्य आणि इतर नक्षत्रांचा उल्लेख आढळतो.',
+        'tip': 'नक्षत्रावरून पावसाची हमी देता येत नाही.'
+      },
+    ];
+
+    Widget sectionTitle(String title, IconData icon) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 14, bottom: 6),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.teal, size: 26),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    Widget informationCard(Map<String, String> item) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item['title']!,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                item['text']!,
+                style: const TextStyle(fontSize: 15),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'टीप: ${item['tip']}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.brown,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return ListView(
-      padding: const EdgeInsets.all(16),
-      children: const [
-        Text('पारंपरिक पावसाचे संकेत',
-            style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold)),
-        SizedBox(height: 8),
+      padding: const EdgeInsets.all(14),
+      children: [
+        const Text(
+          '🌙 पारंपरिक पावसाचे संकेत',
+          style: TextStyle(
+            fontSize: 23,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 6),
         Text(
-          'नक्षत्र आणि सहदेव-भाडळीच्या म्हणी या लोकपरंपरेतील संकेत आहेत. '
-          'त्या आधुनिक हवामान अंदाजाची जागा घेत नाहीत.',
+          'आजची तारीख: ${now.day} ${months[now.month - 1]} ${now.year}',
+          style: const TextStyle(fontSize: 15),
         ),
-        SizedBox(height: 12),
-        Card(
-          child: ListTile(
-            leading: Icon(Icons.nights_stay, color: Colors.teal),
-            title: Text('नक्षत्राधारित अंदाज'),
-            subtitle: Text(
-              'परंपरेत नक्षत्रांशी पावसाचे संबंध सांगितले जातात. '
-              'या आवृत्तीत वर्तमान नक्षत्राची गणना केलेली नाही.',
+        const SizedBox(height: 8),
+        const Card(
+          color: Color(0xFFE0F2F1),
+          child: Padding(
+            padding: EdgeInsets.all(14),
+            child: Text(
+              'महत्त्वाचे: या विभागात आजचे खगोलशास्त्रीय नक्षत्र '
+              'स्वयंचलितपणे मोजले जात नाही. खालील माहिती '
+              'लोकपरंपरा आणि निसर्गनिरीक्षणासाठी आहे.',
+              style: TextStyle(fontSize: 14),
             ),
           ),
         ),
+        sectionTitle('सहदेव-भाडळी आणि नक्षत्र परंपरा',
+            Icons.menu_book),
+        ...sayings.map(informationCard),
+        sectionTitle('निसर्गातील पारंपरिक संकेत',
+            Icons.cloud_outlined),
+        ...observations.map(informationCard),
+        sectionTitle('वैज्ञानिक हवामान अंदाज',
+            Icons.wb_sunny_outlined),
         Card(
-          child: ListTile(
-            leading: Icon(Icons.menu_book, color: Colors.teal),
-            title: Text('सहदेव-भाडळीच्या म्हणी'),
-            subtitle: Text(
-              'या म्हणींचा उपयोग सांस्कृतिक संदर्भ म्हणून करा; '
-              'पावसाची खात्री म्हणून नाही.',
-            ),
-          ),
-        ),
-        Card(
-          child: ListTile(
-            leading: Icon(Icons.cloud_outlined, color: Colors.teal),
-            title: Text('वैज्ञानिक अंदाज'),
-            subtitle: Text(
-              'आजचा आणि पुढील दिवसांचा अंदाज पाहण्यासाठी '
-              'आज आणि तासानुसार हे विभाग वापरा.',
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'हवामित्रच्या इतर विभागांतून तपासा:',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '• आज: तापमान आणि पावसाची शक्यता\n'
+                  '• तासानुसार: पुढील २४ तासांचा अंदाज\n'
+                  '• नकाशा: तुमचे स्थान\n'
+                  '• शेतकरी: हवामानाधारित सामान्य सूचना',
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'लोकपरंपरेतील संकेत आणि आधुनिक अंदाज वेगळे ठेवा. '
+                  'पाऊस, फवारणी किंवा सिंचनाचा निर्णय घेताना '
+                  'अद्ययावत हवामान माहिती व स्थानिक परिस्थिती तपासा.',
+                  style: TextStyle(color: Colors.black54),
+                ),
+              ],
             ),
           ),
         ),
       ],
     );
   }
-}
