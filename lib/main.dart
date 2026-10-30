@@ -440,77 +440,131 @@ class _HavaMitraHomeState extends State<HavaMitraHome> {
         'मातीतील ओलावा पाहूनच सिंचन करा.';
   }
   
-  Widget buildTradition() {
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        const Card(
-          child: ListTile(
-            leading: Icon(
-              Icons.auto_awesome,
-              color: Colors.deepPurple,
-              size: 35,
-            ),
-            title: Text(
-              'नक्षत्र आणि पाऊस',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            subtitle: Text(
-              'नक्षत्रांशी संबंधित पारंपरिक पावसाचे संकेत '
-              'पाहण्यासाठी ही माहिती वापरा. '
-              'नक्षत्रावरून पाऊस निश्चित सांगता येत नाही.',
-            ),
-          ),
-        ),
-        Card(
-          child: ListTile(
-            leading: const Icon(
-              Icons.nights_stay,
-              color: Colors.indigo,
-              size: 35,
-            ),
-            title: const Text('आजचे अंदाजे चंद्र नक्षत्र'),
-            subtitle: Text(
-              getApproxNakshatra(),
-            ),
-          ),
-        ),
-        const Card(
-          child: ListTile(
-            leading: Icon(
-              Icons.menu_book,
-              color: Colors.brown,
-              size: 35,
-            ),
-            title: Text('सहदेव भाडळी परंपरा'),
-            subtitle: Text(
-              'सहदेव भाडळी ही महाराष्ट्रातील पारंपरिक '
-              'पर्जन्य-अंदाजाची लोकपरंपरा आहे. '
-              'ढग, वारा, आर्द्रता आणि निसर्गातील बदल '
-              'यांचे निरीक्षण केले जाते. '
-              'हे संकेत वैज्ञानिक हवामान अंदाजाची जागा घेत नाहीत.',
-            ),
-          ),
-        ),
-        const Card(
-          child: ListTile(
-            leading: Icon(
-              Icons.info_outline,
-              color: Colors.orange,
-            ),
-            title: Text('महत्त्वाची सूचना'),
-            subtitle: Text(
-              'पेरणी, फवारणी किंवा सिंचनाचे निर्णय '
-              'घेताना अधिकृत हवामान अंदाजही तपासा.',
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  
+Widget buildTradition() {
+  final nakshatras = [
+    ['अश्विनी', 'केतू', 'घोड्याच्या वेगाशी संबंधित नक्षत्र.'],
+    ['भरणी', 'शुक्र', 'उष्णता आणि बदल यांच्याशी संबंधित लोकसमज.'],
+    ['कृत्तिका', 'सूर्य', 'उन्हाळ्याच्या तीव्रतेचे पारंपरिक संकेत.'],
+    ['रोहिणी', 'चंद्र', 'पावसाच्या दृष्टीने महत्त्वाचे मानले जाते.'],
+    ['मृगशीर्ष', 'मंगळ', 'पावसाळ्याच्या सुरुवातीशी जोडले जाते.'],
+    ['आर्द्रा', 'राहू', 'पावसाच्या आगमनाशी संबंधित मान्यता.'],
+    ['पुनर्वसू', 'गुरू', 'पावसातील बदलांचे पारंपरिक संकेत.'],
+    ['पुष्य', 'शनी', 'शेतीसाठी पावसाचे निरीक्षण केले जाते.'],
+    ['आश्लेषा', 'बुध', 'ढग आणि पावसाबद्दल लोकसमजुती आहेत.'],
+    ['मघा', 'केतू', 'पावसाच्या बदलांचे पारंपरिक निरीक्षण.'],
+    ['पूर्वा फाल्गुनी', 'शुक्र', 'पावसाच्या स्थितीचे निरीक्षण.'],
+    ['उत्तरा फाल्गुनी', 'सूर्य', 'शेतीतील ओलाव्याशी संबंधित संकेत.'],
+    ['हस्त', 'चंद्र', 'पावसाच्या अंदाजात महत्त्वाचे मानले जाते.'],
+    ['चित्रा', 'मंगळ', 'ढग आणि वाऱ्याचे निरीक्षण.'],
+    ['स्वाती', 'राहू', 'वारा आणि पावसाच्या लोकसमजुती.'],
+    ['विशाखा', 'गुरू', 'पावसातील बदलांचे निरीक्षण.'],
+    ['अनुराधा', 'शनी', 'पारंपरिक पर्जन्य निरीक्षण.'],
+    ['ज्येष्ठा', 'बुध', 'उष्णता आणि पावसाचे निरीक्षण.'],
+    ['मूळ', 'केतू', 'पावसाच्या स्थितीबद्दल लोकसमजुती.'],
+    ['पूर्वाषाढा', 'शुक्र', 'पावसाळ्याच्या निरीक्षणाशी संबंधित.'],
+    ['उत्तराषाढा', 'सूर्य', 'शेतीसाठी पावसाचे निरीक्षण.'],
+    ['श्रवण', 'चंद्र', 'पावसाच्या सातत्याचे पारंपरिक संकेत.'],
+    ['धनिष्ठा', 'मंगळ', 'ढग आणि वाऱ्याचे निरीक्षण.'],
+    ['शततारका', 'राहू', 'पावसाच्या बदलांबद्दल लोकसमजुती.'],
+    ['पूर्वाभाद्रपदा', 'गुरू', 'पारंपरिक पर्जन्य निरीक्षण.'],
+    ['उत्तराभाद्रपदा', 'शनी', 'पावसाच्या स्थितीचे निरीक्षण.'],
+    ['रेवती', 'बुध', 'हंगामातील बदलांचे निरीक्षण.'],
+  ];
 
+  final currentName = getApproxNakshatra()
+      .replaceAll(' (अंदाजे गणना)', '');
+
+  final index = nakshatras.indexWhere(
+    (item) => item[0] == currentName,
+  );
+
+  final selected = index >= 0
+      ? nakshatras[index]
+      : nakshatras[0];
+
+  return ListView(
+    padding: const EdgeInsets.all(12),
+    children: [
+      Card(
+        color: Colors.deepPurple.shade50,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            children: [
+              const Icon(
+                Icons.nights_stay,
+                size: 48,
+                color: Colors.deepPurple,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'आजचे अंदाजे नक्षत्र',
+                style: TextStyle(fontSize: 17),
+              ),
+              Text(
+                selected[0],
+                style: const TextStyle(
+                  fontSize: 27,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text('नक्षत्र क्रमांक: ${index + 1} / 27'),
+            ],
+          ),
+        ),
+      ),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.stars),
+          title: const Text('नक्षत्राचा स्वामी ग्रह'),
+          subtitle: Text(selected[1]),
+        ),
+      ),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.cloud),
+          title: const Text('पारंपरिक पर्जन्य संकेत'),
+          subtitle: Text(selected[2]),
+        ),
+      ),
+      const Card(
+        child: ListTile(
+          leading: Icon(Icons.agriculture, color: Colors.green),
+          title: Text('शेतीसाठी सूचना'),
+          subtitle: Text(
+            'पेरणी, फवारणी आणि सिंचनाचे निर्णय '
+            'प्रत्यक्ष हवामान अंदाज व शेतातील ओलावा '
+            'पाहूनच घ्या.',
+          ),
+        ),
+      ),
+      const Card(
+        child: ListTile(
+          leading: Icon(Icons.menu_book, color: Colors.brown),
+          title: Text('सहदेव भाडळी लोकपरंपरा'),
+          subtitle: Text(
+            'ढगांचा रंग, वाऱ्याची दिशा, विजांचा कडकडाट '
+            'आणि निसर्गातील बदल यांचे निरीक्षण '
+            'पारंपरिक पर्जन्य अंदाजात केले जाते.',
+          ),
+        ),
+      ),
+      const Card(
+        child: Padding(
+          padding: EdgeInsets.all(14),
+          child: Text(
+            'सूचना: ही पारंपरिक माहिती आहे. '
+            'नक्षत्रामुळे पाऊस पडतो याचा वैज्ञानिक '
+            'पुरावा नाही. पावसासाठी हवामान विभागाचा '
+            'अंदाज तपासा.',
+          ),
+        ),
+      ),
+    ],
+  );
+}
+  
   String getApproxNakshatra() {
     final now = DateTime.now().toUtc();
 
