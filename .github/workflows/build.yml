@@ -1,3 +1,4 @@
+
 name: Build HavaMitra Marathi APK
 
 on:
@@ -29,11 +30,6 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Check pubspec.yaml
-        run: |
-          echo "Repository pubspec.yaml:"
-          sed -n '1,35p' pubspec.yaml
-
       - name: Create Android platform files
         run: |
           rm -rf /tmp/hava_mitra_marathi
@@ -42,6 +38,40 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           rm -rf android
           cp -R /tmp/hava_mitra_marathi/android ./android
+
+      - name: Set Android compileSdk to 36
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          kts = Path("android/app/build.gradle.kts")
+          groovy = Path("android/app/build.gradle")
+
+          if kts.exists():
+              p = kts
+              s = p.read_text()
+              s = s.replace(
+                  "compileSdk = flutter.compileSdkVersion",
+                  "compileSdk = 36"
+              )
+              p.write_text(s)
+          elif groovy.exists():
+              p = groovy
+              s = p.read_text()
+              s = s.replace(
+                  "compileSdkVersion flutter.compileSdkVersion",
+                  "compileSdkVersion 36"
+              )
+              s = s.replace(
+                  "compileSdk flutter.compileSdkVersion",
+                  "compileSdk 36"
+              )
+              p.write_text(s)
+          else:
+              raise SystemExit("Android app Gradle file not found")
+
+          print("Android compileSdk set to 36")
+          PY
 
       - name: Add internet and GPS permissions
         run: |
